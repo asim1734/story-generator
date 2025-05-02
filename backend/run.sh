@@ -10,4 +10,4 @@ fi
 if [ -f "main.py" ]; then
     echo "Starting FastAPI server with main.py..."
     uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
+fi
