@@ -16,13 +16,14 @@ export type FormData = {
     temperature: number;
     include_dialogue: boolean;
     include_description: boolean;
+    generate_audio: boolean; // New field for audio generation
 };
 
 export default function StoryForm({
     onStoryGenerated,
     onError,
 }: {
-    onStoryGenerated: (story: string) => void;
+    onStoryGenerated: (response: any) => void; // Updated to accept any response object
     onError: (error: string) => void;
 }) {
     // const router = useRouter();
@@ -35,6 +36,7 @@ export default function StoryForm({
         temperature: 0.8,
         include_dialogue: true,
         include_description: true,
+        generate_audio: false, // Default to false
     });
     const [loading, setLoading] = useState(false);
 
@@ -77,6 +79,7 @@ export default function StoryForm({
                 temperature: Number(form.temperature),
                 include_dialogue: form.include_dialogue,
                 include_description: form.include_description,
+                generate_audio: form.generate_audio, // Include the audio generation flag
             };
 
             const response = await fetch(
@@ -95,7 +98,8 @@ export default function StoryForm({
             }
 
             const data = await response.json();
-            onStoryGenerated(data.story);
+            // Pass the entire response object to the parent component
+            onStoryGenerated(data);
         } catch (err: any) {
             console.error("Error generating story:", err);
             onError(`Failed to generate story: ${err.message}`);
@@ -174,6 +178,24 @@ export default function StoryForm({
                         Lower = more predictable, Higher = more creative
                     </p>
                 </div>
+            </div>
+
+            {/* Audio Generation Option */}
+            <div className="flex items-center">
+                <input
+                    id="generate_audio"
+                    type="checkbox"
+                    name="generate_audio"
+                    checked={form.generate_audio}
+                    onChange={handleInputChange}
+                    className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <label
+                    htmlFor="generate_audio"
+                    className="ml-2 block text-sm text-gray-700"
+                >
+                    Generate audio narration (may take longer)
+                </label>
             </div>
 
             <SubmitButton loading={loading} />
