@@ -23,7 +23,7 @@ export default function StoryForm({
     onStoryGenerated,
     onError,
 }: {
-    onStoryGenerated: (response: any) => void; // Updated to accept any response object
+    onStoryGenerated: (response: unknown) => void; // Updated to accept any response object
     onError: (error: string) => void;
 }) {
     // const router = useRouter();
@@ -56,7 +56,7 @@ export default function StoryForm({
     };
 
     const handleSelectChange = (
-        selectedOption: any,
+        selectedOption: unknown,
         { name }: { name?: string }
     ) => {
         if (name) {
@@ -100,6 +100,7 @@ export default function StoryForm({
             const data = await response.json();
             // Pass the entire response object to the parent component
             onStoryGenerated(data);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             console.error("Error generating story:", err);
             onError(`Failed to generate story: ${err.message}`);

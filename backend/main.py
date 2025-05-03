@@ -51,36 +51,6 @@ app.mount("/samples/audio", StaticFiles(directory=SAMPLE_AUDIO_DIR), name="sampl
 # Initialize the TTS service
 tts_service = TTSService.get_instance()
 
-# ----- Helper Functions -----
-def get_random_sample_story():
-    """Get a random sample story for fallback"""
-    story_files = list(SAMPLE_STORIES_DIR.glob("*.txt"))
-    if not story_files:
-        return None
-    
-    # Pick a random story file
-    random_story_file = random.choice(story_files)
-    story_id = random_story_file.stem
-    
-    # Read the story content
-    with open(random_story_file, "r", encoding="utf-8") as f:
-        story_content = f.read()
-    
-    # Check if corresponding audio exists
-    audio_file = SAMPLE_AUDIO_DIR / f"{story_id}.wav"
-    has_audio = audio_file.exists()
-    
-    result = {
-        "story": story_content,
-        "is_fallback": True,
-        "fallback_reason": "API connection failed or offline mode"
-    }
-    
-    if has_audio:
-        result["audio_url"] = f"/samples/audio/{story_id}.wav"
-    
-    return result
-
 # Define the request body model
 class StoryRequest(BaseModel):
     prompt: str
@@ -160,65 +130,36 @@ def generate_story(story_req: StoryRequest):
         
         # If no fallback available, raise the error
         raise HTTPException(status_code=500, detail=f"Failed to generate story and no fallback available: {str(e)}")
-
-@app.post("/tts")
-def text_to_speech_post(request: TTSRequest):
-    """Generate speech from text submitted via POST and return the audio URL"""
-    try:
-        text = request.text
-        if not text:
-            raise HTTPException(status_code=400, detail="No text provided")
-            
-        # Create a unique filename
-        audio_filename = f"tts_{uuid.uuid4()}.wav"
-        audio_path = AUDIO_DIR / audio_filename
-        
-        # Generate the audio file
-        tts_service.text_to_speech(text, output_path=str(audio_path))
-        
-        # Return the audio URL
-        audio_url = f"/audio/{audio_filename}"
-        return {"audio_url": audio_url}
-    except Exception as e:
-        # Try to find a sample audio file
-        sample_audio_files = list(SAMPLE_AUDIO_DIR.glob("*.wav"))
-        if sample_audio_files:
-            random_audio = random.choice(sample_audio_files)
-            return {"audio_url": f"/samples/audio/{random_audio.name}", "is_fallback": True}
-        
-        # If no fallback, raise the error
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/tts/{text}")
-def text_to_speech_get(text: str):
-    """Generate speech from text and return the audio file"""
-    try:
-        # Create a unique filename
-        audio_filename = f"tts_{uuid.uuid4()}.wav"
-        audio_path = AUDIO_DIR / audio_filename
-        
-        # Generate the audio file
-        tts_service.text_to_speech(text, output_path=str(audio_path))
-        
-        # Return the audio file
-        return FileResponse(
-            path=str(audio_path), 
-            media_type="audio/wav", 
-            filename=audio_filename
-        )
-    except Exception as e:
-        # Try to find a sample audio file
-        sample_audio_files = list(SAMPLE_AUDIO_DIR.glob("*.wav"))
-        if sample_audio_files:
-            random_audio = random.choice(sample_audio_files)
-            return FileResponse(
-                path=str(random_audio),
-                media_type="audio/wav",
-                filename=random_audio.name
-            )
-        
-        # If no fallback, raise the error
-        raise HTTPException(status_code=500, detail=str(e))
+  
+# ----- Helper Functions -----
+def get_random_sample_story():
+    """Get a random sample story for fallback"""
+    story_files = list(SAMPLE_STORIES_DIR.glob("*.txt"))
+    if not story_files:
+        return None
+    
+    # Pick a random story file
+    random_story_file = random.choice(story_files)
+    story_id = random_story_file.stem
+    
+    # Read the story content
+    with open(random_story_file, "r", encoding="utf-8") as f:
+        story_content = f.read()
+    
+    # Check if corresponding audio exists
+    audio_file = SAMPLE_AUDIO_DIR / f"{story_id}.wav"
+    has_audio = audio_file.exists()
+    
+    result = {
+        "story": story_content,
+        "is_fallback": True,
+        "fallback_reason": "API connection failed or offline mode"
+    }
+    
+    if has_audio:
+        result["audio_url"] = f"/samples/audio/{story_id}.wav"
+    
+    return result
 
 # Add a health check endpoint
 @app.get("/health")

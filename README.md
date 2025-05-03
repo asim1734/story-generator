@@ -10,6 +10,7 @@ A full-stack web application that generates creative stories using AI. Built wit
 -   **Customization Options**: Control genre, writing style, characters, and story length.
 -   **Real-time Generation**: See your stories appear within seconds.
 -   **Responsive Design**: Works on desktop and mobile devices.
+-   **Audio Narration**: Generate audio narration for your stories using **Piper TTS**.
 
 ---
 
@@ -19,6 +20,7 @@ A full-stack web application that generates creative stories using AI. Built wit
 
 -   **FastAPI**: High-performance Python web framework.
 -   **Google Gemini API**: State-of-the-art large language model for creative text generation.
+-   **Piper TTS**: Text-to-speech engine for generating audio narration.
 -   **Python 3.10+**: Modern Python for robust server-side code.
 
 ### Frontend
@@ -37,90 +39,92 @@ A full-stack web application that generates creative stories using AI. Built wit
 -   **Python 3.10 or higher**
 -   **Node.js 18 or higher**
 -   **Google Gemini API key**
+-   **Piper TTS voice model**: Download and place the voice model files in `~/piper-voices`.
 
 ---
 
 ### Backend Setup
 
 1. Clone the repository:
+
     ```bash
     git clone https://github.com/your-username/story-generator.git
     cd story-generator
     ```
+
 2. Set up the Python virtual environment:
+
     ```bash
     cd backend
     python -m venv venv
     source venv/bin/activate  # On Windows: venv\Scripts\activate
     ```
+
 3. Install dependencies:
+
     ```bash
     pip install -r requirements.txt
     ```
-4. Create a .env file with your Gemini API key:
+
+4. Create a `.env` file with your Gemini API key:
+
     ```bash
     echo "GEMINI_API_KEY=your_api_key_here" > .env
     ```
-5. Start the backend server:
+
+5. Ensure the Piper TTS voice model is downloaded and placed in `~/piper-voices`. Update the paths in `tts_service.py` if necessary.
+
+6. Start the backend server:
     ```bash
     chmod +x run.sh
     ./run.sh
     ```
-    The API will be available at `http://localhost:8000`
+    The API will be available at [http://localhost:8000](http://localhost:8000).
 
 ---
 
 ### Frontend Setup
 
 1. Install dependencies:
+
     ```bash
     cd ../frontend
     npm install
     ```
+
 2. Start the development server:
     ```bash
     npm run dev
     ```
-    The app will be available at `http://localhost:3000`
+    The app will be available at [http://localhost:3000](http://localhost:3000).
 
 ---
 
 ## API Endpoints
 
--   **POST** `/generate-story`: Generate a story with the following parameters:
-    -   `prompt` (string, required): The main story idea
-    -   `genre` (string, optional): Genre of the story
-    -   `style` (string, optional): Writing style
-    -   `character` (string, optional): Main character
-    -   `story_length` (string, optional): "short", "medium", or "long"
-    -   `temperature` (number, optional): Creativity level (0.1-1.5)
-    -   `include_dialogue` (boolean, optional): Whether to include dialogue
-    -   `include_description` (boolean, optional): Whether to include detailed descriptions
--   **GET** `/health`: Health check endpoint
+### POST `/generate-story`
 
----
+Generate a story with the following parameters:
 
-## Project Structure
+-   **[prompt]** (string, required): The main story idea.
+-   **[genre]** (string, optional): Genre of the story.
+-   **[style]** (string, optional): Writing style.
+-   **[character]** (string, optional): Main character.
+-   **[story_length]** (string, optional): `"short"`, `"medium"`, or `"long"`.
+-   **[temperature]** (number, optional): Creativity level (0.1–1.5).
+-   **[include_dialogue]** (boolean, optional): Whether to include dialogue.
+-   **[include_description]** (boolean, optional): Whether to include detailed descriptions.
+-   **[generate_audio]**(boolean, optional): Whether to generate audio narration for the story.
 
-Collapse
+### POST `/tts`
 
-story-generator/
-├── backend/
-│ ├── main.py # FastAPI application
-│ ├── prompt_builder.py # AI prompt engineering
-│ ├── run.sh # Server startup script
-│ └── requirements.txt # Python dependencies
-│
-└── frontend/
-├── app/ # Next.js app directory
-│ ├── components/ # React components
-│ │ ├── form/ # Form components
-│ │ └── ui/ # UI components
-│ ├── page.tsx # Main page
-│ └── layout.tsx # App layout
-├── public/ # Static assets
-├── package.json # Node.js dependencies
-└── tailwind.config.js # Tailwind CSS configuration
+Generate audio narration for a given text:
+
+-   **[text](http://_vscodecontentref_/9)** (string, required): The text to convert to speech.
+
+### GET `/health`
+
+Health check endpoint.
 
 ---
 
