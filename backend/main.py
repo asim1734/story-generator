@@ -1,14 +1,15 @@
 import os
+import uuid
+import json
+import random
 from dotenv import load_dotenv
 import requests
-import json
-import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from prompt_builder import build_story_prompt
@@ -19,9 +20,17 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 
-# Create audio directory
+# Directory setup
 AUDIO_DIR = Path("./audio_files")
 AUDIO_DIR.mkdir(exist_ok=True)
+
+SAMPLES_DIR = Path("./samples")
+SAMPLE_STORIES_DIR = SAMPLES_DIR / "stories"
+SAMPLE_AUDIO_DIR = SAMPLES_DIR / "audio"
+
+# Ensure sample directories exist
+SAMPLE_STORIES_DIR.mkdir(parents=True, exist_ok=True)
+SAMPLE_AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
 # ----- FastAPI app -----
 app = FastAPI()
@@ -35,11 +44,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount the audio directory
+# Mount static directories
 app.mount("/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
+app.mount("/samples/audio", StaticFiles(directory=SAMPLE_AUDIO_DIR), name="sample_audio")
 
 # Initialize the TTS service
 tts_service = TTSService.get_instance()
+
+# ----- Helper Functions -----
+def get_random_sample_story():
+    """Get a random sample story for fallback"""
+    story_files = list(SAMPLE_STORIES_DIR.glob("*.txt"))
+    if not story_files:
+        return None
+    
+    # Pick a random story file
+    random_story_file = random.choice(story_files)
+    story_id = random_story_file.stem
+    
+    # Read the story content
+    with open(random_story_file, "r", encoding="utf-8") as f:
+        story_content = f.read()
+    
+    # Check if corresponding audio exists
+    audio_file = SAMPLE_AUDIO_DIR / f"{story_id}.wav"
+    has_audio = audio_file.exists()
+    
+    result = {
+        "story": story_content,
+        "is_fallback": True,
+        "fallback_reason": "API connection failed or offline mode"
+    }
+    
+    if has_audio:
+        result["audio_url"] = f"/samples/audio/{story_id}.wav"
+    
+    return result
 
 # Define the request body model
 class StoryRequest(BaseModel):
@@ -53,6 +93,10 @@ class StoryRequest(BaseModel):
     include_description: bool = True
     generate_audio: bool = False
 
+class TTSRequest(BaseModel):
+    text: str
+
+# ----- Endpoints -----
 @app.post("/generate-story")
 def generate_story(story_req: StoryRequest):
     # Map story length to token counts
@@ -83,7 +127,8 @@ def generate_story(story_req: StoryRequest):
     }
     
     try:
-        response = requests.post(API_URL, headers=headers, data=json.dumps(data))
+        # Try to connect to the API
+        response = requests.post(API_URL, headers=headers, data=json.dumps(data), timeout=10)
         response.raise_for_status()
         result = response.json()
         story = result["candidates"][0]["content"]["parts"][0]["text"]
@@ -105,11 +150,47 @@ def generate_story(story_req: StoryRequest):
         
         return response_data
     
+    except (requests.RequestException, Exception) as e:
+        print(f"API error: {str(e)}. Falling back to sample story.")
+        
+        # Fall back to a sample story
+        fallback_story = get_random_sample_story()
+        if fallback_story:
+            return fallback_story
+        
+        # If no fallback available, raise the error
+        raise HTTPException(status_code=500, detail=f"Failed to generate story and no fallback available: {str(e)}")
+
+@app.post("/tts")
+def text_to_speech_post(request: TTSRequest):
+    """Generate speech from text submitted via POST and return the audio URL"""
+    try:
+        text = request.text
+        if not text:
+            raise HTTPException(status_code=400, detail="No text provided")
+            
+        # Create a unique filename
+        audio_filename = f"tts_{uuid.uuid4()}.wav"
+        audio_path = AUDIO_DIR / audio_filename
+        
+        # Generate the audio file
+        tts_service.text_to_speech(text, output_path=str(audio_path))
+        
+        # Return the audio URL
+        audio_url = f"/audio/{audio_filename}"
+        return {"audio_url": audio_url}
     except Exception as e:
+        # Try to find a sample audio file
+        sample_audio_files = list(SAMPLE_AUDIO_DIR.glob("*.wav"))
+        if sample_audio_files:
+            random_audio = random.choice(sample_audio_files)
+            return {"audio_url": f"/samples/audio/{random_audio.name}", "is_fallback": True}
+        
+        # If no fallback, raise the error
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/tts/{text}")
-def text_to_speech(text: str):
+def text_to_speech_get(text: str):
     """Generate speech from text and return the audio file"""
     try:
         # Create a unique filename
@@ -126,6 +207,17 @@ def text_to_speech(text: str):
             filename=audio_filename
         )
     except Exception as e:
+        # Try to find a sample audio file
+        sample_audio_files = list(SAMPLE_AUDIO_DIR.glob("*.wav"))
+        if sample_audio_files:
+            random_audio = random.choice(sample_audio_files)
+            return FileResponse(
+                path=str(random_audio),
+                media_type="audio/wav",
+                filename=random_audio.name
+            )
+        
+        # If no fallback, raise the error
         raise HTTPException(status_code=500, detail=str(e))
 
 # Add a health check endpoint
